@@ -1,0 +1,35 @@
+# Vivado generated files
+*.jou
+*.log
+*.str
+*.pb
+*.wdb
+*.wcfg
+
+# Vivado project-generated directories (project names prefix these suffixes)
+*.cache/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
+*.gen/
+
+# Vivado generated directories without a project-name prefix
+.cache/
+.hw/
+.ip_user_files/
+.runs/
+.sim/
+.gen/
+.Xil/
+
+# Vivado generated project metadata
+*.xpr.bak
+*.xpr.user
+
+# OS/editor files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
