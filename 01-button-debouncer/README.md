@@ -11,6 +11,10 @@ before updating its output. The default interval is 500,000 cycles (about 5 ms
 at 100 MHz). In `counter_test`, the debounced output is a level, so the design
 stores its previous value and increments the LEDs only on a rising edge.
 
+On the Arty A7, BTN0 is used for counting and BTN1 is assigned as reset; it is
+not a separate dedicated reset input. The board's pushbuttons are active high,
+so pressing BTN1 asserts reset.
+
 In the future, I may add an extra debouncer output that signals button edges
 directly, rather than requiring each consuming module to detect edges from the
 debounced level.
