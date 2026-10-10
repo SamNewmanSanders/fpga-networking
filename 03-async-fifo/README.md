@@ -6,9 +6,13 @@ reads it using a different clock. FIFOs like this are useful for safely passing
 data between clock domains, for example between logic running at different
 interface or system clock rates.
 
-The eventual hardware test could use buttons to control writes and reads, or
-another simple input/output demonstration. The exact test setup is still to be
-decided; first, the goal is to get the FIFO working and verify its behavior.
+The hardware demonstration uses buttons to control FIFO writes and reads,
+switches to select the 4-bit input value, and LEDs to display the output and
+FIFO status. The button debouncers are reused from the `01-button-debouncer`
+project. The switches connect directly to the FIFO input without synchronizer
+registers because the intended operation is to set the switch value and let it
+settle before pressing the write button; the input is only sampled for a FIFO
+write on that button press.
 
 ## Asynchronous and synchronous memory reads
 
@@ -25,6 +29,77 @@ BRAM inference. The trade-off is that `data_out` is not a continuously
 available valid word; `empty` indicates whether a read can be accepted, not
 whether the registered output currently contains valid data. A consumer or
 future interface logic must account for the read timing.
+
+## Reset across clock domains
+
+The hardware top, `rtl/fifo_top.sv`, uses **asynchronous assertion and
+synchronous deassertion** for reset. The reset button and the Clocking Wizard's
+`locked` output are not guaranteed to change at a particular instant relative
+to either design clock. A reset signal that changes close to a clock edge can
+violate a flip-flop's setup or hold time and make its output temporarily
+metastable.
+
+The top combines the external reset button and loss of Clocking Wizard lock
+into `reset_request`:
+
+```systemverilog
+assign reset_request = btn_reset || !clk_locked;
+```
+
+There is one two-stage reset synchronizer per clock domain. For example, the
+100 MHz chain is:
+
+```systemverilog
+always_ff @(posedge CLK100MHZ or posedge reset_request) begin
+    if (reset_request)
+        reset_sync_100 <= 2'b11;
+    else
+        reset_sync_100 <= {reset_sync_100[0], 1'b0};
+end
+
+assign reset_100 = reset_sync_100[1];
+```
+
+The asynchronous `reset_request` immediately sets both synchronizer bits,
+asserting reset without waiting for a clock edge. When the request is removed,
+zeros shift through the chain only on rising edges of that chain's clock:
+
+| Event | Synchronizer value | Domain reset |
+|---|---:|---:|
+| Reset asserted | `11` | asserted |
+| First local clock edge after release | `10` | still asserted |
+| Second local clock edge after release | `00` | deasserted |
+
+The 25 MHz chain behaves the same way, but advances only on 25 MHz edges. The
+chains must be separate: a release aligned to the 100 MHz clock is not
+necessarily aligned to the 25 MHz clock. The two stages give the first
+flip-flop time to settle before its value reaches the rest of the domain,
+greatly reducing (but not mathematically eliminating) the chance of
+metastability propagating.
+
+The FIFO therefore has separate `wr_rst` and `rd_rst` inputs. Its write-side
+state and read-pointer synchronizer use `wr_rst`, while its read-side state and
+write-pointer synchronizer use `rd_rst`. These resets are consumed with
+synchronous `if (wr_rst)` / `if (rd_rst)` checks on their respective clock
+edges. Only the small reset synchronizer registers respond asynchronously to
+`reset_request`; the rest of the logic sees reset assertion immediately on its
+next clock edge, and reset release only after two local clock edges.
+
+This pattern is useful when a reset source is asynchronous to a design clock:
+asserting reset promptly puts the design into a known state, while releasing
+reset in a clock-aligned way avoids letting downstream logic resume at an
+arbitrary point in its clock cycle. In this design it also handles the
+generated 25 MHz clock becoming unavailable: loss of `locked` asserts the
+request, and reset release waits for that clock to be available and to advance
+its own synchronizer.
+
+## Verification
+
+The FIFO was simulated and also tested on the Arty A7 board using the switches
+and pushbuttons. Both checks behaved as expected: written values were read back
+and shown on the four mono LEDs, the RGB status indicator showed the FIFO state,
+and full and empty conditions correctly prevented writes and reads,
+respectively.
 
 ## FPGA resource utilisation
 

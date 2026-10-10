@@ -31,7 +31,8 @@ module async_fifo_tb;
     ) dut (
         .wr_clk(wr_clk),
         .rd_clk(rd_clk),
-        .rst(rst),
+        .wr_rst(rst),
+        .rd_rst(rst),
 
         .data_in(data_in),
         .wr_en(wr_en),
@@ -196,4 +197,3 @@ module async_fifo_tb;
     end
 
 endmodule
-

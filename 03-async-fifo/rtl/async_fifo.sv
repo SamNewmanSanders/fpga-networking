@@ -3,10 +3,12 @@ module async_fifo #(
     parameter DEPTH = 2048
 )(
 
-    // Clock domain signals and reset
+    // Clock domain signals and resets. Each reset is synchronous to its
+    // corresponding clock domain.
     input logic wr_clk,
     input logic rd_clk,
-    input logic rst,
+    input logic wr_rst,
+    input logic rd_rst,
 
     // Write signals
     input  logic [DATA_WIDTH-1:0] data_in,
@@ -35,14 +37,15 @@ module async_fifo #(
 
     // -----------------------------------------------------------------------------
 
-    // Pointers - also calculate the grey pointers using the known next value to save a cycle of latency
+    // Write state and the read-pointer synchronizer reset in the write domain.
+    // wr_rst must be synchronized to wr_clk before it is deasserted.
 
     // Write pointer (overflows, so DEPTH must be a power of 2! - also includes bit at start)
     wire [PTR_WIDTH-1:0] next_wr_ptr;
     assign next_wr_ptr = wr_ptr + 1;
 
     always @(posedge wr_clk) begin
-        if (rst) begin
+        if (wr_rst) begin
             wr_ptr <= '0;
             wr_ptr_grey <= '0;
         end
@@ -55,12 +58,13 @@ module async_fifo #(
         end
     end
 
-    // Read pointer
+    // Read state and the write-pointer synchronizer reset in the read domain.
+    // rd_rst must be synchronized to rd_clk before it is deasserted.
     wire [PTR_WIDTH-1:0] next_rd_ptr;
     assign next_rd_ptr = rd_ptr + 1;
 
     always @(posedge rd_clk) begin
-        if (rst) begin
+        if (rd_rst) begin
             rd_ptr <= '0;
             rd_ptr_grey <= '0;
         end
@@ -80,7 +84,7 @@ module async_fifo #(
     reg [PTR_WIDTH-1:0] wr_ff_2;
 
     always @(posedge rd_clk) begin
-        if (rst) begin
+        if (rd_rst) begin
             wr_ff_1 <= '0;
             wr_ff_2 <= '0;
         end
@@ -96,7 +100,7 @@ module async_fifo #(
     reg [PTR_WIDTH-1:0] rd_ff_2;
 
     always @(posedge wr_clk) begin
-        if (rst) begin
+        if (wr_rst) begin
             rd_ff_1 <= '0;
             rd_ff_2 <= '0;
         end
